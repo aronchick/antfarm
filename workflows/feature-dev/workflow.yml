@@ -71,6 +71,17 @@ agents:
         SOUL.md: agents/tester/SOUL.md
         IDENTITY.md: agents/tester/IDENTITY.md
 
+  - id: security-gate
+    name: Security Gate
+    role: security
+    description: Scans code for AI-generated vulnerabilities before PR creation.
+    workspace:
+      baseDir: agents/security-gate
+      files:
+        AGENTS.md: agents/security-gate/AGENTS.md
+        SOUL.md: agents/security-gate/SOUL.md
+        IDENTITY.md: agents/security-gate/IDENTITY.md
+
   - id: reviewer
     name: Reviewer
     role: analysis
@@ -291,6 +302,46 @@ steps:
       STATUS: retry
       FAILURES:
       - Specific test failures or bugs found
+    expects: "STATUS: done"
+    on_fail:
+      retry_step: implement
+      max_retries: 2
+      on_exhausted:
+        escalate_to: human
+
+  - id: security-gate
+    agent: security-gate
+    input: |
+      Security scan before PR creation.
+
+      TASK:
+      {{task}}
+
+      REPO: {{repo}}
+      BRANCH: {{branch}}
+      CHANGES: {{changes}}
+
+      PROGRESS LOG:
+      {{progress}}
+
+      Instructions:
+      1. cd into the repo, checkout the branch
+      2. Run `git diff main...HEAD` to see all changes
+      3. Scan for: hardcoded secrets, injection vectors, missing input validation,
+         overly permissive operations, dependency risks, auth gaps, data exposure,
+         AI code smells (placeholders, TODOs, copy-paste patterns)
+      4. If the project has security linters (eslint-plugin-security, bandit, semgrep), run them
+      5. Rate each finding: 🔴 BLOCK / 🟡 WARN / 🟢 PASS
+
+      If any 🔴 BLOCK findings:
+      STATUS: retry
+      SECURITY_ISSUES:
+      - 🔴 [description and file:line]
+
+      If only 🟡 or clean:
+      STATUS: done
+      SECURITY_REPORT: [findings summary]
+      SECURITY_NOTES: [any warnings to include in PR description]
     expects: "STATUS: done"
     on_fail:
       retry_step: implement
